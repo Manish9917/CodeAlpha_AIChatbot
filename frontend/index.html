@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>AI Chatbot | CodeAlpha</title>
+
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-icon">AI</div>
+          <h2>AI Chatbot</h2>
+        </div>
+
+        <button class="new-chat-btn" id="newChatBtn">
+          <span>+</span> New Chat
+        </button>
+
+        <button
+          class="mobile-history-btn"
+          id="mobileHistoryBtn"
+          type="button"
+          aria-expanded="false"
+          aria-controls="conversationHistory"
+        >
+          History
+        </button>
+
+        <div class="sidebar-info">
+          <p class="sidebar-label">YOUR ASSISTANT</p>
+          <p class="sidebar-description">
+            Your personal AI assistant, ready to help you.
+          </p>
+        </div>
+
+        <!--  Conversation History  -->
+        <section class="conversation-history" id="conversationHistory">
+          <div class="history-heading">
+            <p class="sidebar-label">RECENT CONVERSATIONS</p>
+            <span id="conversationCount">0</span>
+          </div>
+
+          <div
+            class="conversation-list"
+            id="conversationList"
+            aria-label="Conversation history"
+          >
+            <p class="history-empty" id="historyEmpty">
+              Your conversations will appear hear.
+            </p>
+          </div>
+        </section>
+
+        <!-- Theme Toggle -->
+        <button
+          class="theme-toggle-btn"
+          id="themeToggleBtn"
+          type="button"
+          aria-label="Switch to light mode"
+        >
+          <span class="theme-toggle-icon" id="themeToggleIcon">☀</span>
+          <span id="themeToggleText">Light Mode</span>
+        </button>
+
+        <div class="sidebar-footer">
+          <span class="status-dot"></span>
+          <span>Chatbot is ready</span>
+        </div>
+      </aside>
+
+      <!-- Main Chat Area -->
+      <main class="chat-container">
+        <!-- Header -->
+        <header class="chat-header">
+          <div class="assistant-info">
+            <div class="assistant-avatar">AI</div>
+
+            <div>
+              <h1>AI Assistant</h1>
+              <p>
+                <span class="status-dot"></span>
+                Online and ready to help
+              </p>
+            </div>
+          </div>
+
+          <div class="header-badge">Java + Spring Boot</div>
+        </header>
+
+        <!-- Messages -->
+        <section
+          class="chat-messages"
+          id="chatMessages"
+          aria-live="polite"
+          aria-label="Chat messages"
+        >
+          <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-icon">✦</div>
+
+            <h2>How can I help you today?</h2>
+
+            <p>Start a conversation by sending your first message.</p>
+
+            <div class="suggestion-list">
+              <button class="suggestion-btn" data-message="Hello">
+                <span>👋</span> Say hello
+              </button>
+
+              <button class="suggestion-btn" data-message="Who are you?">
+                <span>🤖</span>
+                Who are you?
+              </button>
+
+              <button class="suggestion-btn" data-message="Help">
+                <span>💡</span>
+                Get help
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Message Input -->
+        <footer class="chat-footer">
+          <form class="message-form" id="chatForm">
+            <label for="messageInput" class="visually-hidden">
+              Type your message
+            </label>
+
+            <textarea
+              name="message"
+              id="messageInput"
+              placeholder="Message your AI assistant..."
+              rows="1"
+              maxlength="1000"
+              required
+            ></textarea>
+
+            <button type="submit" id="sendBtn" aria-label="Send message">
+              <span>➤</span>
+            </button>
+          </form>
+
+          <p class="input-hint">
+            Press Enter to send . Shift + Enter for a new line
+          </p>
+        </footer>
+      </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div
+      id="toastContainer"
+      class="toast-container"
+      role="region"
+      aria-label="Notifications"
+      aria-live="polite"
+      aria-atomic="false"
+    ></div>
+
+    <script src="script.js"></script>
+  </body>
+</html> 
