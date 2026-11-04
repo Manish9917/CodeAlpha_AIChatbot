@@ -17,11 +17,22 @@ public class Conversation {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // Nullable to preserve existing conversations
+    // that do not yet belong to a registered user.
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "user_id", nullable = true)
+    private User user;
+
     public Conversation() {
     }
 
     public Conversation(String title) {
         this.title = title;
+    }
+
+    public Conversation(String title, User user) {
+        this.title = title;
+        this.user = user;
     }
 
     @PrePersist
@@ -45,5 +56,13 @@ public class Conversation {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 }
