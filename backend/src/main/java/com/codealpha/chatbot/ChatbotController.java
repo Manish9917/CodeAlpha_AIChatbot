@@ -14,6 +14,8 @@ import com.codealpha.chatbot.dto.MessageResponse;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.http.ResponseEntity;
 
 @CrossOrigin(origins = "http://127.0.0.1:5500")
 @RestController
@@ -33,7 +35,7 @@ public class ChatbotController {
                 request.message());
     }
 
-        @GetMapping("/conversations")
+    @GetMapping("/conversations")
     public List<ConversationResponse> getAllConversations() {
         return chatbotService.getAllConversations();
     }
@@ -42,6 +44,15 @@ public class ChatbotController {
     public List<MessageResponse> getConversationMessages(
             @PathVariable Long id) {
         return chatbotService.getConversationMessages(id);
+    }
+
+    @DeleteMapping("/conversations/{id}")
+    public ResponseEntity<Void> deleteConversation(
+            @PathVariable Long id) {
+
+        chatbotService.deleteConversation(id);
+
+        return ResponseEntity.noContent().build();
     }
 
 }

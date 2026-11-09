@@ -3,165 +3,323 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>AI Chatbot | CodeAlpha</title>
-
+    <meta
+      name="description"
+      content="CodeAlpha AI Chatbot - Your intelligent AI assistant."
+    />
+    <title>CodeAlpha | AI Chatbot</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="app-container">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="brand-icon">AI</div>
-          <h2>AI Chatbot</h2>
+    <!-- Authentication Section -->
+    <section class="auth-screen" id="authScreen">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="auth-logo">✦</div>
+          <h1>CodeAlpha AI</h1>
+          <p>Your intelligent AI assistant</p>
         </div>
 
-        <button class="new-chat-btn" id="newChatBtn">
-          <span>+</span> New Chat
-        </button>
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form">
+          <h2>Welcome Back</h2>
+          <p class="auth-subtitle">Sign in to continue to your account.</p>
 
-        <button
-          class="mobile-history-btn"
-          id="mobileHistoryBtn"
-          type="button"
-          aria-expanded="false"
-          aria-controls="conversationHistory"
-        >
-          History
-        </button>
+          <div class="form-group">
+            <label for="loginEmail">Email Address</label>
+            <input
+              type="email"
+              id="loginEmail"
+              placeholder="Enter your email"
+              autocomplete="email"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input
+              type="password"
+              id="loginPassword"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+
+          <button type="submit" class="auth-submit-btn" id="loginBtn">
+            Sign In
+          </button>
+
+          <p class="auth-switch">
+            Don't have an account?
+            <button type="button" id="showRegisterBtn">Create Account</button>
+          </p>
+        </form>
+
+        <!-- Registration Form -->
+        <form id="registerForm" class="auth-form hidden">
+          <h2>Create Account</h2>
+          <p class="auth-subtitle">Join us and start chatting with AI.</p>
+
+          <div class="form-group">
+            <label for="registerFullName">Full Name</label>
+            <input
+              type="text"
+              id="registerFullName"
+              placeholder="Enter your full name"
+              autocomplete="name"
+              minlength="2"
+              maxlength="100"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="registerEmail">Email Address</label>
+            <input
+              type="email"
+              id="registerEmail"
+              placeholder="Enter your email"
+              autocomplete="email"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="registerPassword">Password</label>
+            <input
+              type="password"
+              id="registerPassword"
+              placeholder="Create a password"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="registerConfirmPassword">Confirm Password</label>
+            <input
+              type="password"
+              id="registerConfirmPassword"
+              placeholder="Confirm your password"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+          </div>
+
+          <button type="submit" class="auth-submit-btn" id="registerBtn">
+            Create Account
+          </button>
+
+          <p class="auth-switch">
+            Already have an account?
+            <button type="button" id="showLoginBtn">Sign In</button>
+          </p>
+        </form>
+
+        <div id="authMessage" class="auth-message" role="alert"></div>
+
+        <p class="auth-footer">Powered by Java &amp; Spring Boot</p>
+      </div>
+    </section>
+
+    <!-- Main Chat Application -->
+    <div class="app-container hidden" id="appContainer">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="brand">
+            <button
+              class="close-mobile-sidebar-btn"
+              id="closeMobileSidebarBtn"
+              type="button"
+              aria-label="Close conversation history"
+            >
+              ✕
+            </button>
+
+            <div class="brand-icon">✦</div>
+            <div class="brand-text">
+              <h2>AI Chatbot</h2>
+              <span>CodeAlpha</span>
+            </div>
+          </div>
+
+          <button class="new-chat-btn" id="newChatBtn" type="button">
+            <span>＋</span> New Chat
+          </button>
+        </div>
 
         <div class="sidebar-info">
-          <p class="sidebar-label">YOUR ASSISTANT</p>
-          <p class="sidebar-description">
-            Your personal AI assistant, ready to help you.
-          </p>
+          <span class="sidebar-section-title">YOUR WORKSPACE</span>
         </div>
 
-        <!--  Conversation History  -->
-        <section class="conversation-history" id="conversationHistory">
+        <!-- Conversation History -->
+        <div class="conversation-history" id="conversationHistory">
           <div class="history-heading">
-            <p class="sidebar-label">RECENT CONVERSATIONS</p>
+            <span>Recent Conversations</span>
             <span id="conversationCount">0</span>
           </div>
 
-          <div
-            class="conversation-list"
-            id="conversationList"
-            aria-label="Conversation history"
-          >
-            <p class="history-empty" id="historyEmpty">
-              Your conversations will appear hear.
-            </p>
+          <div id="conversationList" class="conversation-list"></div>
+
+          <div id="historyEmpty" class="history-empty">
+            <p>No conversations yet.</p>
+            <span>Start a new chat to get started.</span>
           </div>
-        </section>
+        </div>
 
-        <!-- Theme Toggle -->
-        <button
-          class="theme-toggle-btn"
-          id="themeToggleBtn"
-          type="button"
-          aria-label="Switch to light mode"
-        >
-          <span class="theme-toggle-icon" id="themeToggleIcon">☀</span>
-          <span id="themeToggleText">Light Mode</span>
-        </button>
+        <!-- Sidebar Bottom -->
+        <div class="sidebar-bottom">
+          <button class="theme-toggle-btn" id="themeToggleBtn" type="button">
+            <span id="themeIcon">☾</span>
+            <span id="themeText">Dark Mode</span>
+          </button>
 
-        <div class="sidebar-footer">
-          <span class="status-dot"></span>
-          <span>Chatbot is ready</span>
+          <div class="sidebar-user">
+            <div class="user-avatar" id="userAvatar">U</div>
+            <div class="user-details">
+              <strong id="currentUserName">User</strong>
+              <span id="currentUserEmail">Signed in</span>
+            </div>
+          </div>
+
+          <button class="logout-btn" id="logoutBtn" type="button">
+            <span>↪</span> Logout
+          </button>
+
+          <div class="sidebar-footer">
+            <span class="status-indicator"></span>
+            <span>AI Assistant Online</span>
+          </div>
         </div>
       </aside>
 
       <!-- Main Chat Area -->
       <main class="chat-container">
-        <!-- Header -->
+        <!-- Chat Header -->
         <header class="chat-header">
-          <div class="assistant-info">
-            <div class="assistant-avatar">AI</div>
-
-            <div>
-              <h1>AI Assistant</h1>
-              <p>
-                <span class="status-dot"></span>
-                Online and ready to help
-              </p>
+          <div class="header-left">
+            <button
+              class="mobile-history-btn"
+              id="mobileHistoryBtn"
+              type="button"
+              aria-label="Toggle conversation history"
+              aria-expanded="false"
+            >
+              ☰
+            </button>
+            <div class="header-avatar">✦</div>
+            <div class="header-info">
+              <h2>AI Assistant</h2>
+              <span>
+                <span class="status-indicator"></span>
+                Ready to help you
+              </span>
             </div>
           </div>
 
-          <div class="header-badge">Java + Spring Boot</div>
+          <div class="header-right">
+            <span class="technology-badge">Java + Spring Boot</span>
+          </div>
         </header>
 
-        <!-- Messages -->
-        <section
-          class="chat-messages"
-          id="chatMessages"
-          aria-live="polite"
-          aria-label="Chat messages"
-        >
+        <!-- Messages Area -->
+        <section class="chat-messages" id="chatMessages">
+          <!-- Welcome Screen -->
           <div class="welcome-screen" id="welcomeScreen">
             <div class="welcome-icon">✦</div>
 
-            <h2>How can I help you today?</h2>
+            <h1>How can I help you today?</h1>
 
-            <p>Start a conversation by sending your first message.</p>
+            <p>
+              Ask me anything. I'm here to help you learn, explore ideas, and
+              solve problems.
+            </p>
 
-            <div class="suggestion-list">
-              <button class="suggestion-btn" data-message="Hello">
-                <span>👋</span> Say hello
+            <div class="suggestion-grid">
+              <button
+                class="suggestion-card"
+                type="button"
+                data-message="Hello"
+              >
+                <span class="suggestion-icon">👋</span>
+                <strong>Say Hello</strong>
+                <small>Start a conversation</small>
               </button>
 
-              <button class="suggestion-btn" data-message="Who are you?">
-                <span>🤖</span>
-                Who are you?
+              <button
+                class="suggestion-card"
+                type="button"
+                data-message="Who are you?"
+              >
+                <span class="suggestion-icon">🤖</span>
+                <strong>About You</strong>
+                <small>Learn about this AI</small>
               </button>
 
-              <button class="suggestion-btn" data-message="Help">
-                <span>💡</span>
-                Get help
+              <button class="suggestion-card" type="button" data-message="Help">
+                <span class="suggestion-icon">💡</span>
+                <strong>Get Help</strong>
+                <small>Explore what I can do</small>
               </button>
             </div>
           </div>
         </section>
 
-        <!-- Message Input -->
+        <!-- Chat Input -->
         <footer class="chat-footer">
-          <form class="message-form" id="chatForm">
-            <label for="messageInput" class="visually-hidden">
-              Type your message
-            </label>
+          <form class="chat-form" id="chatForm">
+            <div class="input-wrapper">
+              <textarea
+                id="messageInput"
+                placeholder="Message your AI assistant..."
+                rows="1"
+                maxlength="1000"
+                required
+              ></textarea>
 
-            <textarea
-              name="message"
-              id="messageInput"
-              placeholder="Message your AI assistant..."
-              rows="1"
-              maxlength="1000"
-              required
-            ></textarea>
+              <button
+                type="submit"
+                class="send-btn"
+                id="sendBtn"
+                aria-label="Send message"
+              >
+                ➤
+              </button>
+            </div>
 
-            <button type="submit" id="sendBtn" aria-label="Send message">
-              <span>➤</span>
-            </button>
+            <div class="input-footer">
+              <span>Press Enter to send · Shift + Enter for new line</span>
+              <span><span id="characterCount">0</span>/1000</span>
+            </div>
           </form>
 
-          <p class="input-hint">
-            Press Enter to send . Shift + Enter for a new line
+          <p class="disclaimer">
+            AI can make mistakes. Please verify important information.
           </p>
+
+          <div class="developer-credit">
+            Designed &amp; Developed by
+            <strong>Manish Maurya</strong>
+          </div>
         </footer>
       </main>
     </div>
 
     <!-- Toast Notifications -->
-    <div
-      id="toastContainer"
-      class="toast-container"
-      role="region"
-      aria-label="Notifications"
-      aria-live="polite"
-      aria-atomic="false"
-    ></div>
+    <div class="toast-container" id="toastContainer"></div>
 
+    <!-- Markdown Rendering Library -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- HTML Sanitization Library -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+
+    <!-- Application JavaScript -->
     <script src="script.js"></script>
   </body>
-</html> 
+</html>

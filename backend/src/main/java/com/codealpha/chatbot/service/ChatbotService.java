@@ -22,137 +22,144 @@ import java.util.List;
 @Service
 public class ChatbotService {
 
-    private final ConversationRepository conversationRepository;
-    private final MessageRepository messageRepository;
-    private final UserRepository userRepository;
-    private final GeminiService geminiService;
+        private final ConversationRepository conversationRepository;
+        private final MessageRepository messageRepository;
+        private final UserRepository userRepository;
+        private final GeminiService geminiService;
 
-    public ChatbotService(
-            ConversationRepository conversationRepository,
-            MessageRepository messageRepository,
-            UserRepository userRepository,
-            GeminiService geminiService) {
+        public ChatbotService(
+                        ConversationRepository conversationRepository,
+                        MessageRepository messageRepository,
+                        UserRepository userRepository,
+                        GeminiService geminiService) {
 
-        this.conversationRepository = conversationRepository;
-        this.messageRepository = messageRepository;
-        this.userRepository = userRepository;
-        this.geminiService = geminiService;
-    }
-
-    private User getAuthenticatedUser() {
-
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication.getName() == null) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Please log in to continue."
-            );
+                this.conversationRepository = conversationRepository;
+                this.messageRepository = messageRepository;
+                this.userRepository = userRepository;
+                this.geminiService = geminiService;
         }
 
-        return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
-                        "User account not found."
-                ));
-    }
+        private User getAuthenticatedUser() {
 
-    @Transactional
-    public ChatResponse generateReply(Long conversationId, String message) {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (message == null || message.isBlank()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Message must not be empty."
-            );
+                if (authentication == null
+                                || !authentication.isAuthenticated()
+                                || authentication.getName() == null) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.UNAUTHORIZED,
+                                        "Please log in to continue.");
+                }
+
+                return userRepository.findByEmail(authentication.getName())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.UNAUTHORIZED,
+                                                "User account not found."));
         }
 
-        User currentUser = getAuthenticatedUser();
-        String userMessage = message.trim();
+        @Transactional
+        public ChatResponse generateReply(Long conversationId, String message) {
 
-        Conversation conversation;
+                if (message == null || message.isBlank()) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Message must not be empty.");
+                }
 
-        if (conversationId == null) {
+                User currentUser = getAuthenticatedUser();
+                String userMessage = message.trim();
 
-            conversation = conversationRepository.save(
-                    new Conversation(createTitle(userMessage), currentUser)
-            );
+                Conversation conversation;
 
-        } else {
+                if (conversationId == null) {
 
-            conversation = conversationRepository
-                    .findByIdAndUser_Id(conversationId, currentUser.getId())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.NOT_FOUND,
-                            "Conversation not found."
-                    ));
+                        conversation = conversationRepository.save(
+                                        new Conversation(createTitle(userMessage), currentUser));
+
+                } else {
+
+                        conversation = conversationRepository
+                                        .findByIdAndUser_Id(conversationId, currentUser.getId())
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.NOT_FOUND,
+                                                        "Conversation not found."));
+                }
+
+                String reply = geminiService.generateReply(userMessage);
+
+                messageRepository.save(
+                                new Message(conversation, userMessage, "user"));
+
+                messageRepository.save(
+                                new Message(conversation, reply, "assistant"));
+
+                return new ChatResponse(conversation.getId(), reply);
         }
 
-        String reply = geminiService.generateReply(userMessage);
+        private String createTitle(String message) {
 
-        messageRepository.save(
-                new Message(conversation, userMessage, "user")
-        );
+                String title = message.trim().replaceAll("\\s+", " ");
 
-        messageRepository.save(
-                new Message(conversation, reply, "assistant")
-        );
+                if (title.length() > 50) {
+                        return title.substring(0, 47) + "...";
+                }
 
-        return new ChatResponse(conversation.getId(), reply);
-    }
-
-    private String createTitle(String message) {
-
-        String title = message.trim().replaceAll("\\s+", " ");
-
-        if (title.length() > 50) {
-            return title.substring(0, 47) + "...";
+                return title;
         }
 
-        return title;
-    }
+        @Transactional(readOnly = true)
+        public List<ConversationResponse> getAllConversations() {
 
-    @Transactional(readOnly = true)
-    public List<ConversationResponse> getAllConversations() {
+                User currentUser = getAuthenticatedUser();
 
-        User currentUser = getAuthenticatedUser();
+                return conversationRepository
+                                .findAllByUser_IdOrderByCreatedAtDesc(currentUser.getId())
+                                .stream()
+                                .map(conversation -> new ConversationResponse(
+                                                conversation.getId(),
+                                                conversation.getTitle(),
+                                                conversation.getCreatedAt()))
+                                .toList();
+        }
 
-        return conversationRepository
-                .findAllByUser_IdOrderByCreatedAtDesc(currentUser.getId())
-                .stream()
-                .map(conversation -> new ConversationResponse(
-                        conversation.getId(),
-                        conversation.getTitle(),
-                        conversation.getCreatedAt()
-                ))
-                .toList();
-    }
+        @Transactional(readOnly = true)
+        public List<MessageResponse> getConversationMessages(Long conversationId) {
 
-    @Transactional(readOnly = true)
-    public List<MessageResponse> getConversationMessages(Long conversationId) {
+                User currentUser = getAuthenticatedUser();
 
-        User currentUser = getAuthenticatedUser();
+                Conversation conversation = conversationRepository
+                                .findByIdAndUser_Id(conversationId, currentUser.getId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Conversation not found."));
 
-        Conversation conversation = conversationRepository
-                .findByIdAndUser_Id(conversationId, currentUser.getId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Conversation not found."
-                ));
+                return messageRepository
+                                .findByConversationIdOrderByCreatedAtAsc(conversation.getId())
+                                .stream()
+                                .map(message -> new MessageResponse(
+                                                message.getId(),
+                                                message.getContent(),
+                                                message.getSender(),
+                                                message.getCreatedAt()))
+                                .toList();
+        }
 
-        return messageRepository
-                .findByConversationIdOrderByCreatedAtAsc(conversation.getId())
-                .stream()
-                .map(message -> new MessageResponse(
-                        message.getId(),
-                        message.getContent(),
-                        message.getSender(),
-                        message.getCreatedAt()
-                ))
-                .toList();
-    }
+        @Transactional
+        public void deleteConversation(Long conversationId) {
+
+                User currentUser = getAuthenticatedUser();
+
+                Conversation conversation = conversationRepository
+                                .findByIdAndUser_Id(conversationId, currentUser.getId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Conversation not found."));
+
+                // Delete all messages belonging to this conversation first.
+                messageRepository.deleteByConversation_Id(conversation.getId());
+
+                // Delete the conversation after deleting its messages.
+                conversationRepository.delete(conversation);
+        }
 }

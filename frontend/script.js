@@ -1,20 +1,408 @@
-// Configuration
+"use strict";
 
-const API_URL = "http://localhost:8080/api/chat";
+/* =========================================
+   CONFIGURATION
+========================================= */
 
-// Theme Toggle Elements
+const API_BASE_URL = "http://localhost:8080";
+const API_URL = `${API_BASE_URL}/api/chat`;
+
+const TOKEN_KEY = "chatbot_token";
+const USER_KEY = "chatbot_user";
+const THEME_KEY = "chatbot-theme";
+
+/* =========================================
+   DOM ELEMENTS
+========================================= */
+
+// Authentication
+const authScreen = document.getElementById("authScreen");
+const loginForm = document.getElementById("loginForm");
+const registerForm = document.getElementById("registerForm");
+
+const showRegisterBtn = document.getElementById("showRegisterBtn");
+const showLoginBtn = document.getElementById("showLoginBtn");
+
+const authMessage = document.getElementById("authMessage");
+const loginBtn = document.getElementById("loginBtn");
+const registerBtn = document.getElementById("registerBtn");
+
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+
+const registerFullName = document.getElementById("registerFullName");
+const registerEmail = document.getElementById("registerEmail");
+const registerPassword = document.getElementById("registerPassword");
+const registerConfirmPassword = document.getElementById(
+  "registerConfirmPassword",
+);
+
+// Application
+const appContainer = document.getElementById("appContainer");
+
+const currentUserName = document.getElementById("currentUserName");
+const currentUserEmail = document.getElementById("currentUserEmail");
+const userAvatar = document.getElementById("userAvatar");
+const logoutBtn = document.getElementById("logoutBtn");
+
+// Theme
 const themeToggleBtn = document.getElementById("themeToggleBtn");
-const themeToggleIcon = document.getElementById("themeToggleIcon");
-const themeToggleText = document.getElementById("themeToggleText");
+const themeIcon = document.getElementById("themeIcon");
+const themeText = document.getElementById("themeText");
 
-// Apply selected theme
+// Chat
+const chatForm = document.getElementById("chatForm");
+const messageInput = document.getElementById("messageInput");
+const chatMessages = document.getElementById("chatMessages");
+const sendBtn = document.getElementById("sendBtn");
+const newChatBtn = document.getElementById("newChatBtn");
+const welcomeScreen = document.getElementById("welcomeScreen");
+
+const conversationList = document.getElementById("conversationList");
+const conversationCount = document.getElementById("conversationCount");
+const historyEmpty = document.getElementById("historyEmpty");
+
+const mobileHistoryBtn = document.getElementById("mobileHistoryBtn");
+const closeMobileSidebarBtn = document.getElementById("closeMobileSidebarBtn");
+const toastContainer = document.getElementById("toastContainer");
+const characterCount = document.getElementById("characterCount");
+
+/* =========================================
+   APPLICATION STATE
+========================================= */
+
+let isWaitingForResponse = false;
+let currentConversationId = null;
+let currentUser = null;
+let toastIdCounter = 0;
+
+/* =========================================
+   API HELPERS
+========================================= */
+
+function getToken() {
+  return sessionStorage.getItem(TOKEN_KEY);
+}
+
+function getAuthHeaders() {
+  const token = getToken();
+
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function readResponse(response) {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+}
+
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...getAuthHeaders(),
+      ...(options.headers || {}),
+    },
+  });
+
+  const data = await readResponse(response);
+
+  if (response.status === 401) {
+    handleSessionExpired();
+    throw new Error("Your session has expired. Please sign in again.");
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || data.error || "The request could not be completed.",
+    );
+  }
+
+  return data;
+}
+
+/* =========================================
+   AUTHENTICATION MESSAGES
+========================================= */
+
+function showAuthMessage(message, type = "error") {
+  authMessage.textContent = message;
+  authMessage.className = `auth-message ${type}`;
+}
+
+function clearAuthMessage() {
+  authMessage.textContent = "";
+  authMessage.className = "auth-message";
+}
+
+function setAuthLoading(button, isLoading, normalText) {
+  button.disabled = isLoading;
+  button.textContent = isLoading ? "Please wait..." : normalText;
+}
+
+function showLoginScreen() {
+  loginForm.classList.remove("hidden");
+  registerForm.classList.add("hidden");
+  clearAuthMessage();
+}
+
+function showRegisterScreen() {
+  registerForm.classList.remove("hidden");
+  loginForm.classList.add("hidden");
+  clearAuthMessage();
+}
+
+/* =========================================
+   USER REGISTRATION
+========================================= */
+
+showRegisterBtn.addEventListener("click", showRegisterScreen);
+
+registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearAuthMessage();
+
+  const fullName = registerFullName.value.trim();
+  const email = registerEmail.value.trim();
+  const password = registerPassword.value;
+  const confirmPassword = registerConfirmPassword.value;
+
+  if (password !== confirmPassword) {
+    showAuthMessage("Passwords do not match.");
+    return;
+  }
+
+  if (password.length < 8) {
+    showAuthMessage("Password must contain at least 8 characters.");
+    return;
+  }
+
+  setAuthLoading(registerBtn, true, "Create Account");
+
+  try {
+    const data = await apiRequest(`${API_BASE_URL}/api/auth/register`, {
+      method: "POST",
+      body: JSON.stringify({
+        fullName,
+        email,
+        password,
+      }),
+    });
+
+    showAuthMessage(
+      data.message || "Account created successfully. Please sign in.",
+      "success",
+    );
+
+    registerForm.reset();
+
+    window.setTimeout(() => {
+      showLoginScreen();
+      loginEmail.value = email;
+      loginPassword.focus();
+    }, 1200);
+  } catch (error) {
+    showAuthMessage(error.message);
+  } finally {
+    setAuthLoading(registerBtn, false, "Create Account");
+  }
+});
+
+/* =========================================
+   USER LOGIN
+========================================= */
+
+showLoginBtn.addEventListener("click", showLoginScreen);
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearAuthMessage();
+
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value;
+
+  setAuthLoading(loginBtn, true, "Sign In");
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+    });
+
+    const data = await readResponse(response);
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || data.error || "Invalid email or password.",
+      );
+    }
+
+    if (!data.token) {
+      throw new Error("The server did not return an authentication token.");
+    }
+
+    const user = {
+      userId: data.userId,
+      fullName: data.fullName || email.split("@")[0],
+      email: data.email || email,
+    };
+
+    sessionStorage.setItem(TOKEN_KEY, data.token);
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+
+    currentUser = user;
+
+    loginForm.reset();
+
+    await openApplication();
+
+    showToast("Welcome back!", "success");
+  } catch (error) {
+    showAuthMessage(error.message);
+  } finally {
+    setAuthLoading(loginBtn, false, "Sign In");
+  }
+});
+
+/* =========================================
+   APPLICATION ACCESS
+========================================= */
+
+function showApplication() {
+  authScreen.classList.add("hidden");
+  appContainer.classList.remove("hidden");
+}
+
+function showAuthentication() {
+  appContainer.classList.add("hidden");
+  authScreen.classList.remove("hidden");
+  showLoginScreen();
+}
+
+function updateUserProfile(user) {
+  currentUserName.textContent = user.fullName || "User";
+  currentUserEmail.textContent = user.email || "";
+
+  userAvatar.textContent = (user.fullName || "U")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+}
+
+async function openApplication() {
+  showApplication();
+
+  updateUserProfile(currentUser);
+
+  await initializeChat();
+
+  messageInput.focus();
+}
+
+/* =========================================
+   RESTORE EXISTING SESSION
+========================================= */
+
+async function restoreSession() {
+  const token = getToken();
+
+  if (!token) {
+    showAuthentication();
+    return;
+  }
+
+  try {
+    const savedUser = sessionStorage.getItem(USER_KEY);
+
+    currentUser = savedUser ? JSON.parse(savedUser) : null;
+
+    if (!currentUser) {
+      throw new Error("User session information is unavailable.");
+    }
+
+    await apiRequest(`${API_BASE_URL}/api/conversations`);
+
+    await openApplication();
+  } catch (error) {
+    console.error("Session restoration failed:", error);
+
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+
+    currentUser = null;
+    showAuthentication();
+  }
+}
+
+/* =========================================
+   LOGOUT
+========================================= */
+
+logoutBtn.addEventListener("click", () => {
+  if (isWaitingForResponse) {
+    showToast("Please wait for the current response to finish.", "info");
+    return;
+  }
+
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
+
+  currentUser = null;
+  currentConversationId = null;
+
+  conversationList.replaceChildren();
+  chatMessages.replaceChildren();
+
+  loginForm.reset();
+  registerForm.reset();
+
+  showAuthentication();
+
+  showToast("You have been logged out successfully.", "success");
+});
+
+/* =========================================
+   SESSION EXPIRATION
+========================================= */
+
+function handleSessionExpired() {
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
+
+  currentUser = null;
+  currentConversationId = null;
+
+  showAuthentication();
+}
+
+/* =========================================
+   THEME MANAGEMENT
+========================================= */
+
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
 
   const isDark = theme === "dark";
 
-  themeToggleIcon.textContent = isDark ? "☀" : "☾";
-  themeToggleText.textContent = isDark ? "Light Mode" : "Dark Mode";
+  themeIcon.textContent = isDark ? "☀" : "☾";
+  themeText.textContent = isDark ? "Light Mode" : "Dark Mode";
 
   themeToggleBtn.setAttribute(
     "aria-label",
@@ -22,41 +410,31 @@ function applyTheme(theme) {
   );
 }
 
-// Load saved theme
-const savedTheme = localStorage.getItem("chatbot-theme") || "dark";
+const savedTheme = localStorage.getItem(THEME_KEY) || "dark";
+
 applyTheme(savedTheme);
 
-// Toggle theme
 themeToggleBtn.addEventListener("click", () => {
   const currentTheme = document.documentElement.getAttribute("data-theme");
+
   const newTheme = currentTheme === "dark" ? "light" : "dark";
 
   applyTheme(newTheme);
-  localStorage.setItem("chatbot-theme", newTheme);
+  localStorage.setItem(THEME_KEY, newTheme);
 });
 
-// Toast Notifications
-
-const toastContainer = document.getElementById("toastContainer");
-
-let toastIdCounter = 0;
+/* =========================================
+   TOAST NOTIFICATIONS
+========================================= */
 
 function showToast(message, type = "success", duration = 3000) {
-  if (!toastContainer) {
-    console.warn("Toast container was not found:", message);
-    return;
-  }
-
   const toast = document.createElement("div");
-  const toastId = `toast-${++toastIdCounter}`;
 
-  toast.id = toastId;
   toast.className = `toast toast-${type}`;
   toast.setAttribute("role", type === "error" ? "alert" : "status");
 
   const icon = document.createElement("span");
   icon.className = "toast-icon";
-  icon.setAttribute("aria-hidden", "true");
 
   const icons = {
     success: "✓",
@@ -76,22 +454,12 @@ function showToast(message, type = "success", duration = 3000) {
   closeButton.setAttribute("aria-label", "Dismiss notification");
   closeButton.textContent = "×";
 
-  let dismissTimer;
-
   function dismissToast() {
-    window.clearTimeout(dismissTimer);
+    if (!toast.isConnected) return;
 
-    if (!toast.isConnected) {
-      return;
-    }
-
+    window.clearTimeout(timer);
     toast.classList.add("toast-hiding");
 
-    toast.addEventListener("transitionend", () => toast.remove(), {
-      once: true,
-    });
-
-    // Fallback in case the transition event does not fire.
     window.setTimeout(() => toast.remove(), 300);
   }
 
@@ -100,37 +468,18 @@ function showToast(message, type = "success", duration = 3000) {
   toast.append(icon, text, closeButton);
   toastContainer.appendChild(toast);
 
-  // Limit the number of visible notifications.
   while (toastContainer.children.length > 4) {
     toastContainer.firstElementChild.remove();
   }
 
-  dismissTimer = window.setTimeout(dismissToast, duration);
-
-  return toast;
+  const timer = window.setTimeout(dismissToast, duration);
 }
 
-// DOM Elements
+/* =========================================
+   CHAT MESSAGE DISPLAY
+========================================= */
 
-const chatForm = document.getElementById("chatForm");
-const messageInput = document.getElementById("messageInput");
-const chatMessages = document.getElementById("chatMessages");
-const sendBtn = document.getElementById("sendBtn");
-const newChatBtn = document.getElementById("newChatBtn");
-const welcomeScreen = document.getElementById("welcomeScreen");
-
-const conversationList = document.getElementById("conversationList");
-const conversationCount = document.getElementById("conversationCount");
-const mobileHistoryBtn = document.getElementById("mobileHistoryBtn");
-
-// State
-
-let isWaitingForResponse = false;
-let currentConversationId = null;
-
-// Create Message Bubble
-
-function addMessage(text, sender) {
+function addMessage(messageText, sender) {
   const messageElement = document.createElement("div");
   messageElement.classList.add("message", sender);
 
@@ -147,11 +496,19 @@ function addMessage(text, sender) {
 
   const bubble = document.createElement("div");
   bubble.classList.add("message-bubble");
-  bubble.textContent = text;
+  if (sender === "assistant" && window.marked && window.DOMPurify) {
+    const renderedMarkdown = window.marked.parse(messageText, {
+      gfm: true,
+      breaks: true,
+    });
+
+    bubble.innerHTML = window.DOMPurify.sanitize(renderedMarkdown);
+  } else {
+    bubble.textContent = messageText;
+  }
 
   content.append(name, bubble);
 
-  // Add a copy button to assistant messages only.
   if (sender === "assistant") {
     const actions = document.createElement("div");
     actions.className = "message-actions";
@@ -165,11 +522,10 @@ function addMessage(text, sender) {
 
     copyButton.addEventListener("click", async () => {
       try {
-        await copyTextToClipboard(text);
+        await copyTextToClipboard(messageText);
 
         copyButton.textContent = "Copied!";
         copyButton.classList.add("copied");
-        copyButton.setAttribute("aria-label", "Response copied");
 
         showToast("Response copied successfully.", "success");
 
@@ -177,12 +533,11 @@ function addMessage(text, sender) {
           if (copyButton.isConnected) {
             copyButton.textContent = "Copy";
             copyButton.classList.remove("copied");
-            copyButton.setAttribute("aria-label", "Copy AI response");
           }
         }, 1800);
       } catch (error) {
         console.error("Copy failed:", error);
-        showToast("Unable to copy the response. Please try again.", "error");
+        showToast("Unable to copy the response.", "error");
       }
     });
 
@@ -198,7 +553,9 @@ function addMessage(text, sender) {
   return messageElement;
 }
 
-// Copy text with a fallback for browsers without Clipboard API access.
+/* =========================================
+   COPY TO CLIPBOARD
+========================================= */
 
 async function copyTextToClipboard(text) {
   if (navigator.clipboard && window.isSecureContext) {
@@ -207,11 +564,11 @@ async function copyTextToClipboard(text) {
   }
 
   const temporaryTextArea = document.createElement("textarea");
+
   temporaryTextArea.value = text;
   temporaryTextArea.setAttribute("readonly", "");
   temporaryTextArea.style.position = "fixed";
   temporaryTextArea.style.left = "-9999px";
-  temporaryTextArea.style.top = "0";
 
   document.body.appendChild(temporaryTextArea);
   temporaryTextArea.select();
@@ -227,16 +584,17 @@ async function copyTextToClipboard(text) {
   }
 }
 
-// Scroll to Latest Message
+/* =========================================
+   CHAT UTILITIES
+========================================= */
 
 function scrollToBottom() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Show Typing Indicator
-
 function showTypingIndicator() {
   const messageElement = document.createElement("div");
+
   messageElement.classList.add("message", "assistant");
   messageElement.id = "typingIndicator";
 
@@ -259,18 +617,13 @@ function showTypingIndicator() {
     indicator.appendChild(dot);
   }
 
-  content.appendChild(name);
-  content.appendChild(indicator);
-
-  messageElement.appendChild(avatar);
-  messageElement.appendChild(content);
+  content.append(name, indicator);
+  messageElement.append(avatar, content);
 
   chatMessages.appendChild(messageElement);
 
   scrollToBottom();
 }
-
-// Remove Typing Indicator
 
 function removeTypingIndicator() {
   const indicator = document.getElementById("typingIndicator");
@@ -280,17 +633,18 @@ function removeTypingIndicator() {
   }
 }
 
-// Update Input State
-
 function setLoading(isLoading) {
   isWaitingForResponse = isLoading;
+
   sendBtn.disabled = isLoading;
   messageInput.disabled = isLoading;
 
   sendBtn.setAttribute("aria-busy", String(isLoading));
 }
 
-// Send Message to Backend
+/* =========================================
+   SEND CHAT MESSAGE
+========================================= */
 
 async function sendMessage(message) {
   const trimmedMessage = message.trim();
@@ -299,106 +653,103 @@ async function sendMessage(message) {
     return;
   }
 
-  // Hide the welcome screen after the first message.
-  if (welcomeScreen) {
+  if (!getToken()) {
+    handleSessionExpired();
+    return;
+  }
+
+  if (welcomeScreen && welcomeScreen.isConnected) {
     welcomeScreen.remove();
   }
 
-  // Display the user's message.
   addMessage(trimmedMessage, "user");
 
-  //Clear the input field.
   messageInput.value = "";
   messageInput.style.height = "auto";
+
+  if (characterCount) {
+    characterCount.textContent = "0";
+  }
 
   setLoading(true);
   showTypingIndicator();
 
   try {
-    const response = await fetch(API_URL, {
+    const data = await apiRequest(API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         conversationId: currentConversationId,
         message: trimmedMessage,
       }),
     });
 
-    // Read the response body.
-    const data = await response.json();
-
-    // Handle HTTP errors returned by the backend.
-    if (!response.ok) {
-      const errorMessage = data.message || "The request could not be completed";
-
-      throw new Error(errorMessage);
-    }
-
-    // Save the conversation ID returned by the backend.
     if (
-      typeof data.conversationId === "number" &&
-      Number.isFinite(data.conversationId)
+      typeof data.conversationId !== "number" ||
+      !Number.isFinite(data.conversationId)
     ) {
-      currentConversationId = data.conversationId;
-
-      // Refresh the sidebar history after receiving the conversation ID.
-      await loadConversations();
-    } else {
       throw new Error("The server returned an invalid conversation ID.");
     }
 
-    // Display the chatbot's reply.
-    if (typeof data.reply === "string") {
-      addMessage(data.reply, "assistant");
-    } else {
+    currentConversationId = data.conversationId;
+
+    if (typeof data.reply !== "string") {
       throw new Error("The server returned an unexpected response.");
     }
+
+    addMessage(data.reply, "assistant");
+
+    await loadConversations();
   } catch (error) {
     console.error("Chat request failed:", error);
 
-    addMessage(
-      error.message || "Unable to connect to the chatbot. Please try again.",
-      "assistant",
-    );
+    if (getToken()) {
+      addMessage(
+        error.message || "Unable to connect to the chatbot.",
+        "assistant",
+      );
+    }
   } finally {
     removeTypingIndicator();
     setLoading(false);
-    messageInput.focus();
+
+    if (getToken()) {
+      messageInput.focus();
+    }
   }
 }
 
-// Handle Form Submission
+/* =========================================
+   CHAT FORM EVENTS
+========================================= */
 
-chatForm.addEventListener("submit", function (event) {
+chatForm.addEventListener("submit", (event) => {
   event.preventDefault();
-
   sendMessage(messageInput.value);
 });
 
-// Enter to Send
-// Shift + Enter for New Line
-
-messageInput.addEventListener("keydown", function (event) {
+messageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
     chatForm.requestSubmit();
   }
 });
 
-// Auto-Resize Textarea
-
-messageInput.addEventListener("input", function () {
+messageInput.addEventListener("input", () => {
   messageInput.style.height = "auto";
 
   messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + "px";
+
+  if (characterCount) {
+    characterCount.textContent = messageInput.value.length;
+  }
 });
 
-// Suggestion Buttons
+/* =========================================
+   SUGGESTION BUTTONS
+========================================= */
 
-document.querySelectorAll(".suggestion-btn").forEach(function (button) {
-  button.addEventListener("click", function () {
+document.querySelectorAll(".suggestion-card").forEach((button) => {
+  button.addEventListener("click", () => {
     const suggestedMessage = button.dataset.message;
 
     if (suggestedMessage) {
@@ -407,9 +758,11 @@ document.querySelectorAll(".suggestion-btn").forEach(function (button) {
   });
 });
 
-// Start a New Chat
+/* =========================================
+   NEW CHAT
+========================================= */
 
-newChatBtn.addEventListener("click", function () {
+newChatBtn.addEventListener("click", () => {
   if (isWaitingForResponse) {
     return;
   }
@@ -422,39 +775,41 @@ newChatBtn.addEventListener("click", function () {
     chatMessages.appendChild(welcomeScreen);
   }
 
+  document.querySelectorAll(".conversation-item").forEach((button) => {
+    button.classList.remove("active");
+  });
+
   messageInput.value = "";
   messageInput.style.height = "auto";
+
+  if (characterCount) {
+    characterCount.textContent = "0";
+  }
+
   messageInput.focus();
 });
 
-// Initial Setup
-
-messageInput.focus();
-
-console.log("AI Chatbot frontend initialized successfully.");
+/* =========================================
+   LOAD CONVERSATION HISTORY
+========================================= */
 
 async function loadConversations() {
   try {
-    const response = await fetch("http://localhost:8080/api/conversations");
-
-    if (!response.ok) {
-      throw new Error("Unable to load conversation history.");
-    }
-
-    const conversations = await response.json();
+    const conversations = await apiRequest(`${API_BASE_URL}/api/conversations`);
 
     conversationList.replaceChildren();
+
     conversationCount.textContent = conversations.length;
 
-    if (conversations.length === 0) {
-      const emptyMessage = document.createElement("p");
-      emptyMessage.className = "history-empty";
-      emptyMessage.textContent = "Your conversations will appear here.";
-      conversationList.appendChild(emptyMessage);
-      return;
+    if (historyEmpty) {
+      historyEmpty.style.display =
+        conversations.length === 0 ? "block" : "none";
     }
 
     conversations.forEach((conversation) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "conversation-item-wrapper";
+
       const button = document.createElement("button");
       button.type = "button";
       button.className = "conversation-item";
@@ -470,26 +825,98 @@ async function loadConversations() {
         loadConversation(conversation.id);
       });
 
-      conversationList.appendChild(button);
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "delete-conversation-btn";
+      deleteButton.textContent = "×";
+      deleteButton.title = "Delete conversation";
+      deleteButton.setAttribute("aria-label", "Delete conversation");
+
+      deleteButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        deleteConversation(conversation.id, deleteButton);
+      });
+
+      wrapper.append(button, deleteButton);
+      conversationList.appendChild(wrapper);
     });
   } catch (error) {
     console.error("Conversation history error:", error);
+
+    if (getToken()) {
+      showToast("Unable to load conversation history.", "error");
+    }
   }
 }
 
-async function loadConversation(conversationId) {
-  try {
-    const response = await fetch(
-      `http://localhost:8080/api/conversations/${conversationId}/messages`,
-    );
+/* =========================================
+   DELETE CONVERSATION
+========================================= */
 
-    if (!response.ok) {
-      throw new Error("Unable to load this conversation.");
+async function deleteConversation(conversationId, deleteButton) {
+  if (isWaitingForResponse) {
+    showToast("Please wait for the current response to finish.", "info");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Are you sure you want to permanently delete this conversation and all its messages?",
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  deleteButton.disabled = true;
+
+  try {
+    await apiRequest(`${API_BASE_URL}/api/conversations/${conversationId}`, {
+      method: "DELETE",
+    });
+
+    if (currentConversationId === conversationId) {
+      currentConversationId = null;
+
+      chatMessages.replaceChildren();
+
+      if (welcomeScreen) {
+        chatMessages.appendChild(welcomeScreen);
+      }
+
+      messageInput.value = "";
+      messageInput.style.height = "auto";
+
+      if (characterCount) {
+        characterCount.textContent = "0";
+      }
     }
 
-    const messages = await response.json();
+    await loadConversations();
+
+    showToast("Conversation deleted successfully.", "success");
+
+    messageInput.focus();
+  } catch (error) {
+    console.error("Conversation deletion failed:", error);
+
+    showToast(error.message || "Unable to delete this conversation.", "error");
+
+    deleteButton.disabled = false;
+  }
+}
+
+/* =========================================
+   RESTORE A PREVIOUS CONVERSATION
+========================================= */
+
+async function loadConversation(conversationId) {
+  try {
+    const messages = await apiRequest(
+      `${API_BASE_URL}/api/conversations/${conversationId}/messages`,
+    );
 
     currentConversationId = conversationId;
+
     chatMessages.replaceChildren();
 
     messages.forEach((message) => {
@@ -516,20 +943,25 @@ async function loadConversation(conversationId) {
     messageInput.focus();
   } catch (error) {
     console.error("Load conversation error:", error);
-    showToast("Could not load this conversation. Please try again.", "error");
+
+    if (getToken()) {
+      showToast("Could not load this conversation. Please try again.", "error");
+    }
   }
 }
 
-// Initialize conversation history and restore the latest conversation.
+/* =========================================
+   INITIALIZE CHAT
+========================================= */
 
 async function initializeChat() {
   await loadConversations();
 
-  try {
-    if (!conversationList) {
-      return;
-    }
+  if (!getToken()) {
+    return;
+  }
 
+  try {
     const latestConversation =
       conversationList.querySelector(".conversation-item");
 
@@ -538,20 +970,42 @@ async function initializeChat() {
 
       if (Number.isFinite(conversationId)) {
         await loadConversation(conversationId);
+        return;
       }
+    }
+
+    chatMessages.replaceChildren();
+
+    if (welcomeScreen) {
+      chatMessages.appendChild(welcomeScreen);
     }
   } catch (error) {
     console.error("Chat initialization error:", error);
-    showToast("Unable to restore the previous conversation.", "error");
   }
 }
 
-initializeChat();
+/* =========================================
+   MOBILE HISTORY
+========================================= */
 
 mobileHistoryBtn.addEventListener("click", () => {
-  const conversationHistory = document.getElementById("conversationHistory");
-
-  const isOpen = conversationHistory.classList.toggle("mobile-history-open");
+  const isOpen = sidebar.classList.toggle("mobile-open");
 
   mobileHistoryBtn.setAttribute("aria-expanded", String(isOpen));
 });
+
+closeMobileSidebarBtn.addEventListener("click", () => {
+  sidebar.classList.remove("mobile-open");
+
+  mobileHistoryBtn.setAttribute("aria-expanded", "false");
+});
+
+const conversationHistory = document.getElementById("conversationHistory");
+
+/* =========================================
+   APPLICATION STARTUP
+========================================= */
+
+console.log("CodeAlpha AI Chatbot frontend initialized.");
+
+restoreSession();
