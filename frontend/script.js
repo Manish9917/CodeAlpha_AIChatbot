@@ -4,7 +4,7 @@
    CONFIGURATION
 ========================================= */
 
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = "https://codealpha-ai-chatbot-backend.onrender.com";
 const API_URL = `${API_BASE_URL}/api/chat`;
 
 const TOKEN_KEY = "chatbot_token";
